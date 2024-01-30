@@ -49,7 +49,6 @@ fn main() {
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read line");
-        // let command = input.trim();
 
         let parts: Vec<&str> = input.trim().splitn(2, ' ').collect();
         let command = parts.get(0).map(|&s| s.to_lowercase());
@@ -140,8 +139,6 @@ fn list_todos(param: Option<Filter>) {
 }
 
 fn add_todo(item: String) {
-    // print!("Please enter your todo item: ");
-    // io::stdout().flush().expect("Failed to flush stdout");
     let todo_item = TodoItem::new(item.trim().to_string());
     // io::stdin()
     //     .read_line(&mut todo_item.item)
@@ -170,14 +167,6 @@ fn add_todo(item: String) {
 fn done_todo(num: &str) {
     let path = Path::new("todo.txt");
 
-    // 询问用户输入完成的 todo 序号
-    // print!("Enter the ID of the todo you've done: ");
-    // io::stdout().flush().expect("Failed to flush stdout");
-    // let mut id_input = String::new();
-    // io::stdin()
-    //     .read_line(&mut id_input)
-    //     .expect("Failed to read line");
-
     // 将输入转换为有意义的数字
     let id: usize = if let Ok(num) = num.parse::<usize>() {
         num
@@ -194,14 +183,12 @@ fn done_todo(num: &str) {
         let line = line.expect("Unable to read line");
         let line_arr: Vec<&str> = line.split("\\t ").collect();
 
-        let status = if line_arr[1].contains("TODO") {
-            Status::TODO
-        } else if line_arr[1].contains("DONE") {
-            Status::DONE
-        } else {
-            Status::TODO
+        let status = match line_arr[1].trim() {
+            "TODO" => Status::TODO,
+            "DONE" => Status::DONE,
+            _ => unreachable!(),
         };
-
+        
         let time = line_arr[2].trim().to_string();
 
         todos.push(TodoItem {
