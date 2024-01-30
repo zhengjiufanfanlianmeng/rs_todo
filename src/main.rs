@@ -11,6 +11,10 @@ enum Status {
     DONE,
 }
 
+enum Filter {
+    DESCTIME,
+    ASCTIME,
+}
 #[derive(Debug)]
 struct TodoItem {
     item: String,
@@ -53,11 +57,12 @@ fn main() {
                 }
             }
             Some("list") => {
-                // if parts.len() == 2 {
-                list_todos(parts.get(1));
-                // } else {
-                //     println!("No todo ID provided.");
-                // }
+                let filter_opt = match parts.get(1) {
+                    Some(&"--desctime") => Some(Filter::DESCTIME),
+                    Some(&"--asctime") => Some(Filter::ASCTIME),
+                    _ => None,
+                };
+                list_todos(filter_opt);
             }
             Some("done") => {
                 if let Some(num) = parts.get(1) {
@@ -72,7 +77,7 @@ fn main() {
     }
 }
 
-fn list_todos(param: Option<&&str>) {
+fn list_todos(param: Option<Filter>) {
     let mut table = Table::new();
     table.add_row(row!["ID", "Item", "Status", "CreateTime"]);
     let path = Path::new("todo.txt");
@@ -85,15 +90,32 @@ fn list_todos(param: Option<&&str>) {
     };
 
     let reader = BufReader::new(file);
-    for (index, line) in reader.lines().enumerate() {
-        let line = line.unwrap().replace("\\r", "");
-        let line_arr = line
-            .split("\\t ")
-            .collect::<Vec<&str>>()
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>();
-        table.add_row(row![index + 1, line_arr[0], line_arr[1], line_arr[2]]);
+    let mut rows: Vec<_> = reader
+        .lines()
+        .enumerate()
+        .map(|(index, line)| {
+            let line = line.unwrap().replace("\\r", "");
+            let parts = line
+                .split("\\t ")
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>();
+
+            // 构建行，包括index以便排序
+            (index + 1, parts)
+        })
+        .collect();
+
+    match param {
+        Some(Filter::DESCTIME) => {
+            rows.sort_by_key(|&(.., ref line_parts)| std::cmp::Reverse(line_parts[2].clone()))
+        }
+        Some(Filter::ASCTIME) => rows.sort_by_key(|&(.., ref line_parts)| line_parts[2].clone()),
+        None => {} // 不进行排序
+    }
+
+    // 对表中行内容进行插入排序结果
+    for (index, row) in rows {
+        table.add_row(row![index, row[0], row[1], row[2]]);
     }
 
     if table.len() == 1 {
@@ -101,52 +123,7 @@ fn list_todos(param: Option<&&str>) {
         return;
     }
 
-    if param == None {
-        table.printstd();
-    } else if *param.unwrap() == "--desctime" {
-        let mut rows: Vec<&Row> = table.into_iter().skip(1).clone().collect();
-
-        // 对行进行排序
-        rows.sort_by(|a, b| {
-            let time_a = a
-                .get_cell(3)
-                .unwrap()
-                .get_content()
-                .parse::<String>()
-                .unwrap();
-            let time_b = b
-                .get_cell(3)
-                .unwrap()
-                .get_content()
-                .parse::<String>()
-                .unwrap();
-            time_b.cmp(&time_a)
-        });
-
-        push2_table(rows);
-    } else if *param.unwrap() == "--asctime" {
-        let mut rows: Vec<&Row> = table.into_iter().skip(1).clone().collect();
-
-        // 对行进行排序
-        rows.sort_by(|a, b| {
-            let time_a = a
-                .get_cell(3)
-                .unwrap()
-                .get_content()
-                .parse::<String>()
-                .unwrap();
-            let time_b = b
-                .get_cell(3)
-                .unwrap()
-                .get_content()
-                .parse::<String>()
-                .unwrap();
-            time_a.cmp(&time_b)
-        });
-        push2_table(rows);
-    }
-
-    // table.printstd();
+    table.printstd();
     println!("");
 }
 
@@ -175,7 +152,7 @@ fn add_todo(item: String) {
         .expect("Unable to open the file");
 
     writeln!(file, "{}", todo_entry).expect("Failed to write to file");
-    list_todos(Option::None);
+    list_todos(None);
 }
 
 fn done_todo(num: &str) {
@@ -253,19 +230,6 @@ fn done_todo(num: &str) {
 
     if found {
         println!("Todo item {} set as done.", id);
-        list_todos(Option::None);
+        list_todos(None);
     }
-}
-
-fn push2_table(rows: Vec<&Row>) {
-    let mut sorted_table = Table::new();
-    sorted_table.add_row(row!["ID", "Item", "Status", "CreateTime"]);
-
-    // 将排序后的行添加回表格
-    for row in rows.iter() {
-        sorted_table.add_row(row.clone().clone());
-    }
-
-    // 打印排序后的表格
-    sorted_table.printstd();
 }
