@@ -1,4 +1,4 @@
-use prettytable::{row, Row, Table};
+use prettytable::{row, Table};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
@@ -11,10 +11,16 @@ enum Status {
     DONE,
 }
 
-enum Filter {
+enum Order {
     DESCTIME,
     ASCTIME,
 }
+
+enum Filter {
+    Status(Status),
+    Order(Order),
+}
+
 #[derive(Debug)]
 struct TodoItem {
     item: String,
@@ -58,8 +64,10 @@ fn main() {
             }
             Some("list") => {
                 let filter_opt = match parts.get(1) {
-                    Some(&"--desctime") => Some(Filter::DESCTIME),
-                    Some(&"--asctime") => Some(Filter::ASCTIME),
+                    Some(&"--asctime") => Some(Filter::Order(Order::DESCTIME)),
+                    Some(&"--desctime") => Some(Filter::Order(Order::ASCTIME)),
+                    Some(&"--done") => Some(Filter::Status(Status::DONE)),
+                    Some(&"--todo") => Some(Filter::Status(Status::TODO)),
                     _ => None,
                 };
                 list_todos(filter_opt);
@@ -106,10 +114,14 @@ fn list_todos(param: Option<Filter>) {
         .collect();
 
     match param {
-        Some(Filter::DESCTIME) => {
+        Some(Filter::Order(Order::DESCTIME)) => {
             rows.sort_by_key(|&(.., ref line_parts)| std::cmp::Reverse(line_parts[2].clone()))
         }
-        Some(Filter::ASCTIME) => rows.sort_by_key(|&(.., ref line_parts)| line_parts[2].clone()),
+        Some(Filter::Order(Order::ASCTIME)) => rows.sort_by_key(|&(.., ref line_parts)| line_parts[2].clone()),
+        Some(Filter::Status(Status::TODO)) => 
+            rows.retain(|&(.., ref line_parts)| line_parts[1].contains("TODO")),
+        Some(Filter::Status(Status::DONE)) => 
+            rows.retain(|&(.., ref line_parts)| line_parts[1].contains("DONE")),
         None => {} // 不进行排序
     }
 
