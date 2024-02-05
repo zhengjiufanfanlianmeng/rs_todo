@@ -78,6 +78,13 @@ fn main() {
                     println!("No todo ID provided.");
                 }
             }
+            Some("remove") => {
+                if let Some(num) = parts.get(1) {
+                    remove_todo(num);
+                } else {
+                    println!("No todo ID provided.");
+                }
+            }
             Some("quit") | Some("exit") => break,
             _ => println!("Unknown or incomplete command."),
         }
@@ -91,7 +98,7 @@ fn list_todos(param: Option<Filter>) {
     let file = match OpenOptions::new().read(true).open(&path) {
         Ok(file) => file,
         Err(_) => {
-            println!("No todo.txt found. You might want to add some todo items first.");
+            println!("No todo.txt found. You might want to add some todo items first!");
             return;
         }
     };
@@ -116,11 +123,15 @@ fn list_todos(param: Option<Filter>) {
         Some(Filter::Order(Order::DESCTIME)) => {
             rows.sort_by_key(|&(.., ref line_parts)| std::cmp::Reverse(line_parts[2].clone()))
         }
-        Some(Filter::Order(Order::ASCTIME)) => rows.sort_by_key(|&(.., ref line_parts)| line_parts[2].clone()),
-        Some(Filter::Status(Status::TODO)) => 
-            rows.retain(|&(.., ref line_parts)| line_parts[1].contains("TODO")),
-        Some(Filter::Status(Status::DONE)) => 
-            rows.retain(|&(.., ref line_parts)| line_parts[1].contains("DONE")),
+        Some(Filter::Order(Order::ASCTIME)) => {
+            rows.sort_by_key(|&(.., ref line_parts)| line_parts[2].clone())
+        }
+        Some(Filter::Status(Status::TODO)) => {
+            rows.retain(|&(.., ref line_parts)| line_parts[1].contains("TODO"))
+        }
+        Some(Filter::Status(Status::DONE)) => {
+            rows.retain(|&(.., ref line_parts)| line_parts[1].contains("DONE"))
+        }
         None => {} // 不进行排序
     }
 
@@ -130,7 +141,7 @@ fn list_todos(param: Option<Filter>) {
     }
 
     if table.len() == 1 {
-        println!("No todo items found, pelase add some items first.");
+        println!("No todo item found, pelase add some items first!\r\n");
         return;
     }
 
@@ -140,9 +151,6 @@ fn list_todos(param: Option<Filter>) {
 
 fn add_todo(item: String) {
     let todo_item = TodoItem::new(item.trim().to_string());
-    // io::stdin()
-    //     .read_line(&mut todo_item.item)
-    //     .expect("Failed to read line");
 
     let todo_entry = format!(
         "{}\\t {:?}\\t {}\\r\
@@ -171,7 +179,7 @@ fn done_todo(num: &str) {
     let id: usize = if let Ok(num) = num.parse::<usize>() {
         num
     } else {
-        println!("Please enter a valid number");
+        println!("Please enter a valid ID");
         return;
     };
 
@@ -188,7 +196,7 @@ fn done_todo(num: &str) {
             "DONE" => Status::DONE,
             _ => unreachable!(),
         };
-        
+
         let time = line_arr[2].trim().to_string();
 
         todos.push(TodoItem {
@@ -231,4 +239,85 @@ fn done_todo(num: &str) {
         println!("Todo item {} set as done.", id);
         list_todos(None);
     }
+}
+
+fn remove_todo(num: &str) {
+    let path = Path::new("todo.txt");
+
+    let id: usize = if let Ok(num) = num.parse::<usize>() {
+        num
+    } else {
+        println!("Please enter a valid ID.");
+        return;
+    };
+
+    let mut todos = Vec::new();
+    let file = match File::open(&path) {
+        Ok(file) => BufReader::new(file),
+        Err(error) => {
+            match error.kind() {
+                io::ErrorKind::NotFound => {
+                    println!("Todo file not found. Perhaps you'd like to add some todo item first?")
+                }
+                _ => println!("An error occurred while opening todo file: {}", error),
+            }
+            return;
+        }
+    };
+
+    
+    let file = BufReader::new(file);
+    
+    for line in file.lines() {
+        // 收集非要删除的 todo items
+        let line = line.expect("Unable to read line.");
+        let time_parts: Vec<&str> = line.split("\\t ").collect(); // 分割字符串获取各个字段
+        
+        let status = match time_parts[1] {
+            "TODO" => Status::TODO,
+            "DONE" => Status::DONE,
+            _ => unreachable!(),
+        };
+        
+        let time = time_parts[2].replace("\\r", "");
+        
+        todos.push(TodoItem {
+            item: String::from(time_parts[0]),
+            status,
+            time,
+        });
+        
+    }
+    
+    if todos.is_empty() {
+        println!("No todo item found, pelase add some items first!\r\n");
+        return;
+    } else {
+        todos.remove(id - 1);
+    }
+
+    if id > todos.len() + 1 || id == 0 {
+        println!("The ID provided does not exist.\r\n");
+        return;
+    }
+
+    // 把更新后的 todo 列表写回文件
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&path)
+        .expect("Unable to open file");
+
+    for todo in todos {
+        let todo_entry = format!(
+            "{}\\t {:?}\\t {}\\r\
+",
+            todo.item, todo.status, todo.time
+        );
+
+        writeln!(file, "{}", todo_entry).expect("Failed to write to file");
+    }
+
+    println!("Todo item {} has been removed.", id);
+    list_todos(None);
 }
