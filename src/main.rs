@@ -40,7 +40,7 @@ impl TodoItem {
 
 fn main() {
     println!("\r\nUSAGE");
-    println!("· 'list' -> list all todo items\r\n· 'add' -> add a new todo item\r\n· 'done' -> finish the todo item\r\n· 'quit' or 'exit' -> exit the program\r\n");
+    println!("· 'list' -> list all todo items\r\n· 'add' -> add a new todo item\r\n· 'done' -> finish the todo item\r\n· 'quit' or 'exit' -> exit the program\r\n· 'remove' -> remove the todo item\r\n");
 
     loop {
         print!("> ");
